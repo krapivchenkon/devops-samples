@@ -1,0 +1,27 @@
+---
+- name: ec2-sample
+  hosts: localhost
+  connection: local
+  # become: true
+  gather_facts : false
+  tasks:
+    - name: Provision a set of instances
+      ec2:
+         key_name: ec2demo
+         group: default
+         instance_type: t2.micro
+         image: ami-823686f5
+         wait: true
+         exact_count: 1
+         count_tag:
+            Name: Demo
+         instance_tags:
+            Name: Demo
+      register: ec2
+
+  # - name: install tools
+  #   apt: name={{item}} state=present
+  #   with_items:
+  #     - curl
+  #     - python-httplib2
+  #   tags: ['packages']

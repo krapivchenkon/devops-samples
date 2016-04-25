@@ -1,0 +1,9 @@
+
+# skip any public/private keys generated
+id_rsa*
+
+# python virtualenv directory
+venv
+
+# Skip Ansible *.retry files
+*.retry
