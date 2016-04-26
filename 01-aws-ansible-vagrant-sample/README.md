@@ -19,6 +19,7 @@ This sample shows how ec2 instance can be started with ansible ec2 module and fu
     $ . venv/bin/activate
     $ pip install -r requirements.txt
     ```
+
 - Now we need to setup your aws user credentials:
     ```
     $ export AWS_ACCESS_KEY_ID='YOUR-KEY-ID'
@@ -32,6 +33,7 @@ This sample shows how ec2 instance can be started with ansible ec2 module and fu
     ssh-keygen -t rsa -b 4096 -C "youremail@example.com" -f ./id_rsa && chmod 600 id_rsa.pub
     aws ec2 import-key-pair --key-name ec2demo --public-key-material file://./id_rsa.pub
     ```
+
 - Add dynamic inventory scripts using ansible(`ec2.py` and `ec2.ini`) (`TODO:`should be part of playbook)
 ansible-playbook -vvv sample_playbook.yml -i hosts
 
@@ -40,6 +42,7 @@ ansible-playbook -vvv sample_playbook.yml -i hosts
     ```
     $ ansible-playbook -vvv sample_playbook.yml -i ec2.py
     ```
+
 - Stop instances (`TODO: ` add task to playbook)
 - Restart instances (`TODO: ` add task to playbook)
 
@@ -48,6 +51,7 @@ ansible-playbook -vvv sample_playbook.yml -i hosts
     ```
     $ssh -i ./id_rsa ubuntu@ec2-xx-xxx-xx-xxx.eu-west-1.compute.amazonaws.com
     ```
+
 - Ping hosts with dynamic inventory scripts
     ```
     $ ansible -vvv -i ec2.py -u ubuntu eu-west-1 -m ping --key-file=./id_rsa
@@ -64,11 +68,12 @@ ansible-playbook -vvv sample_playbook.yml -i hosts
   # To disable the cache, set this value to 0
   cache_max_age = 300
   ```
+ 
 - If you are running `virtualenv` path to python should be set in group vars [group_vars/all.yml](group_vars/all.yml):
     ```
     ansible_python_interpreter: "{{ lookup('env','PWD') }}/venv/bin/python"
     ```
-    
+
 ## Links
 - [Ansible ec2 module docs](http://docs.ansible.com/ansible/ec2_module.html#this-is-a-core-module)
 
