@@ -35,7 +35,9 @@ This sample shows how ec2 instance can be started with ansible ec2 module and fu
     ```
 
 - Add dynamic inventory scripts using ansible(`ec2.py` and `ec2.ini`) (`TODO:`should be part of playbook)
-ansible-playbook -vvv sample_playbook.yml -i hosts
+    ```
+    ansible-playbook -vvv sample_playbook.yml -i hosts
+    ```
 
 - Add ssh inbound rule to security group configuration (`TODO:` should be done by ec2_groups module)
 - Start instances
