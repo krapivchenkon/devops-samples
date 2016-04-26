@@ -11,9 +11,6 @@ This sample shows how ec2 instance can be started with ansible ec2 module and fu
 ### Prerequisites
 - You'll need `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` envronment variables set up.
 - Installed `vagrant` if you want to use vagrant to spin off machines
-- 
-
-
 
 ## Setup
 - First we need to prepare tools for running scripts:
@@ -45,6 +42,7 @@ ansible-playbook -vvv sample_playbook.yml -i hosts
     ```
 - Stop instances (`TODO: ` add task to playbook)
 - Restart instances (`TODO: ` add task to playbook)
+
 ## Checking environment
 - Connect to instances via ssh:
     ```
@@ -59,14 +57,14 @@ ansible-playbook -vvv sample_playbook.yml -i hosts
 ## Configuration
 - Dynamic inventory cache configuration
 
-    EC2 inventory cache time can be configured in [ec2.ini](ec2.ini) file:
+    EC2 inventory cache time can be configured in [ec2.ini](https://raw.githubusercontent.com/ansible/ansible/devel/contrib/inventory/ec2.ini) file:
   ```
   # The number of seconds a cache file is considered valid. After this many
   # seconds, a new API call will be made, and the cache file will be updated.
   # To disable the cache, set this value to 0
   cache_max_age = 300
   ```
-- If you are running `virtualenv` path to python should be set in group vars [./group_vars/all.yml](./group_vars/all.yml):
+- If you are running `virtualenv` path to python should be set in group vars [group_vars/all.yml](group_vars/all.yml):
     ```
     ansible_python_interpreter: "{{ lookup('env','PWD') }}/venv/bin/python"
     ```
