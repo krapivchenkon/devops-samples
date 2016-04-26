@@ -1,5 +1,0 @@
-[local]
-# if running ansible using virtualenv, specify path to python intepreter
-localhost ansible_python_interpreter=./venv/bin/python
-# in other cases specify hosts as following
-# localhost ansible_python_interpreter=./venv/bin/python

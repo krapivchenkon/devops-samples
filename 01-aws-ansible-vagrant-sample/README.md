@@ -7,9 +7,10 @@ This sample shows how ec2 instance can be started with ansible ec2 module and fu
 ### Features
     - Uses ubuntu/trusty ami instance
     - env can be restored easily on aws and localy with the same ansible playbooks
-    - #TODO fully automated instance start - all keys created and SG rules are added from ansible scripts
-    - #TODO shows sample of using ec2 dynamic inventory
-    - #TODO use `vagrant` to start both local and ec2 instances
+    - \#TODO fully automated instance start - all keys created and SG rules are added from ansible scripts
+    - \#TODO shows sample of using ec2 dynamic inventory
+    - \#TODO use `vagrant` to start both local and ec2 instances
+    - \#TODO ec2 dynamic inventory scripts downloaded by playbook
     
 
 
@@ -44,21 +45,38 @@ ansible-playbook -vvv sample_playbook.yml -i hosts
 
 add ssh rule to SG configuration
 
+\#TODO add dynamic inventory scripts using ansible
+
 ssh -i ./id_rsa ubuntu@ec2-54-229-90-177.eu-west-1.compute.amazonaws.com
 
 
+# ping hosts with dynamic inventory scripts
+ansible -vvv -i ec2.py -u ubuntu eu-west-1 -m ping --key-file=./id_rsa
+
+\#TODO use ssh key from group vars
+
+ansible-playbook  -vvv sample_playbook.yml -i ec2.py --key-file=id_rsa
+\#TODO dynamic inventory caching
+
+\#TODO using results of inventory script
+
+\#TODO setup zone vars to group_vars variables
+
 
 ## Open Questions and TODOs
+ - What is local action
  - ansible + aws only
      - start/stop ec2 instance with ansible
      - ping 
      - sample of running status check playbooks hostname.yml playbook
      - restart same instances without creating new
 
- -TODO adding vagrant
+ - \#TODO adding vagrant
  - vagrant file contains vars from env
  - 
 
+
+\#TODO check the case when ec2_facts returns multiplie instances
 
 
 

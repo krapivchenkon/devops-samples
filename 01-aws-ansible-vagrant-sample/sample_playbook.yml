@@ -10,14 +10,34 @@
          key_name: ec2demo
          group: default
          instance_type: t2.micro
-         image: ami-823686f5
+         image: ami-823686f5 # ubuntu image
          wait: true
          exact_count: 1
          count_tag:
-            Name: Demo
+            Name: Demo 
          instance_tags:
-            Name: Demo
+            Name: Demo # Assign tag demo to EC2 instances
       register: ec2
+
+    - debug: "msg='Started instances {{ ec2.instances }}'"
+      when: ec2.instances is defined
+
+
+    - name: Add all instance public IPs to host group
+      add_host: hostname={{ item.public_ip }} groups=ec2hosts
+      with_items: '{{ ec2.instances }}'
+
+
+# - authorized_key: user=charlie key="{{ lookup('file', 'id_rsa.pub') }}"
+
+- name: configuration play
+  hosts: ec2hosts,ec2
+  user: ubuntu
+  gather_facts: false
+
+  tasks:
+    - name: get server hostname
+      command:  hostname
 
   # - name: install tools
   #   apt: name={{item}} state=present
@@ -25,3 +45,31 @@
   #     - curl
   #     - python-httplib2
   #   tags: ['packages']
+
+
+- name: state mgmt play
+  hosts: ec2
+  user: ubuntu
+  # tags: ['stop']
+  gather_facts: false 
+  tasks:
+    - name: Stop the sandbox instances
+      tags: ["stop"]
+      ec2:
+        instance_tags: 
+          name: "Demo"
+        state: stopped
+        # instance_ids: '{{ instance_ids }}'
+        # region: '{{ region }}'
+        # state: stopped
+        # wait: True
+        # vpc_subnet_id: subnet-29e63245
+        # assign_public_ip: yes
+
+    - name: Gather EC2 facts
+      local_action: ec2_facts
+      tags: ["facts"]
+    - debug: var=hostvars[inventory_hostname]
+      tags: ["facts"]
+    - debug: msg="{{ hostvars[inventory_hostname]['ec2_id'] }}"
+      tags: ["facts"]

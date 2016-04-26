@@ -1,0 +1,2 @@
+# if using virtualenv this property shoud be set
+ansible_python_interpreter: "{{ lookup('env','PWD') }}/venv/bin/python"
