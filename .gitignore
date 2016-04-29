@@ -1,9 +1,13 @@
+# skip file with TODO notes
+TODO*
 
 # skip any public/private keys generated
 id_rsa*
+
 # skip AWS dynamic scripts as they can be changed
 ec2.ini
 ec2.py
+
 # python virtualenv directory
 venv
 
