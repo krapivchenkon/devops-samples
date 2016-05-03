@@ -1,6 +1,5 @@
 # if using virtualenv this property shoud be set
 # ansible_python_interpreter: "{{ lookup('env','PWD') }}/venv/bin/python"
-#TODO: set name of ssh-key file here and use it everywhere
 
 
 # AWS vars
@@ -10,3 +9,5 @@ aws_instance_type       : 't2.micro'
 aws_ami_image           : 'ami-823686f5' # ubuntu image
 aws_instance_tag        : 'AnsibleDemo'
 aws_key_name            : 'ec2demo'
+aws_ec2_count           : 5
+aws_ec2_user            : 'ubuntu'

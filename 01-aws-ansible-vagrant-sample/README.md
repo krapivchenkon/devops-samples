@@ -7,22 +7,24 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
 - Uses ubuntu/trusty64 ami instance
 - Contains playbooks for:
 	- Launching instances (`--tags start`)
-	- `TODO:` Stopping instances (`--tags stop`)
-	- `TODO:` Terminating instances (`--tags term`)
+	- Stopping instances (`--tags stop`)
+	- Terminating instances (`--tags term` or `--tags term_stopped`)
 	- `TODO:` Restarting instances (`--tags restart`)
-	- `TODO:` Simple health check tasks (`--tags check`)
+	- Simple health check tasks (`--tags check`)
 - `TODO:` Uses EC2 Dynamic inventory scripts to create static **hosts_ec2** file
 - `TODO:` On starting instance ssh and icmp rules are configured in default security group
-- `TODO:` SSH key-pair created automatically on startup
-- `TODO:` Playbooks are using ec2_remote_facts with tag filters to add existing hosts to **ec2hosts** group.
+- `TODO:` SSH key-pair created automatically with pass-phrase check and ssh-agent on startup
+- Playbooks are using ec2_remote_facts with tag filters to add existing hosts to **ec2hosts** group.
 	- when running start/stop/term/restart instances host group created from the values returned by **ec2_remote_facts**
+- `TODO:` Enable python paramiko for ssh connections 
 
 ### Configuration assumptions
 - all instances are created in default **security group**.
 - [group_vars/ec2.yml](group_vars/ec2.yml) contains following configurations:
-	- `TODO:` Tag name that will be assigned to ec2 instances
+	- Path to ssh_key
 - [group_vars/all.yml](group_vars/all.yml) contains following configurations:
-	- `TODO:` Default zone in `aws_default_region`
+	- Default zone in `aws_default_region`
+	- Tag name that will be assigned to ec2 instances
 ### Prerequisites
 - You'll need `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables set up.
 - `TODO:` Installed `vagrant` if you want to use vagrant to spin off machines
@@ -39,17 +41,15 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
     ```
     $ export AWS_ACCESS_KEY_ID='YOUR-KEY-ID'
     $ export AWS_SECRET_ACCESS_KEY='YOUR-SECRET-KEY'
-    # eu-west-1 is Ireland
-    $ export AWS_DEFAULT_REGION=eu-west-1
     ```
 
-- Generate ssh key and exchange it with server (`TODO:` should be part of ansible playbook)
+- `TODO:` Generate ssh key and exchange it with server (should be part of ansible playbook)
     ```
     ssh-keygen -t rsa -b 4096 -C "youremail@example.com" -f ./id_rsa && chmod 600 id_rsa.pub
     aws ec2 import-key-pair --key-name ec2demo --public-key-material file://./id_rsa.pub
     ```
 
-- Add dynamic inventory scripts using ansible(`ec2.py` and `ec2.ini`) (`TODO:`should be part of playbook)
+- `TODO:` Add dynamic inventory scripts using ansible(`ec2.py` and `ec2.ini`) (should be part of playbook)
     ```
     ansible-playbook -vvv sample_playbook.yml -i hosts
     ```
@@ -57,13 +57,56 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
 - `TODO:` Add ssh inbound rule to security group configuration (should be done by ec2_groups module)
 - Start instances
     ```
-    $ ansible-playbook -vvv sample_playbook.yml -i ec2.py
+    $ ansible-playbook  sample_playbook.yml --tags start
+    ```
+	> Startup logic works in a way described below. Assume that:  
+	> **all_inst** - number of instances that should be in running state  
+	> **stop_inst** - number of currently stopped instances of the same type(from **ec2_remote_facts**)  
+	> **run_inst** -  - number of currently running instances of the same type(from **ec2_remote_facts**)  
+	> 
+	```python
+	if run_inst < all_inst:
+		startInstances(all_inst-run_inst)
+
+	# following command will ensure that we are running correct number of instances
+	# this is the case when there are not enough stopped instances (all_inst>(run_inst+stop_inst))
+	run_ec2_task_with_exact_count(all_inst)
+	```   
+	
+- Stop instances 
+	Following will stop all running instances
+    ```
+    $ ansible-playbook  sample_playbook.yml --tags stop
     ```
 
-- Stop instances (`TODO: ` add task to playbook)
-- Restart instances (`TODO: ` add task to playbook)
+- Terminate instances 
+	Following will terminate all instances with specific tag
+    ```
+    $ ansible-playbook  sample_playbook.yml --tags term
+    ```
+	Following will terminate only stopped instances with specific tag
+    ```
+    $ ansible-playbook  sample_playbook.yml --tags term_stopped
+    ```
+
+- Restart instances 
 
 ## Checking environment
+- Run health checks on ec2 host group
+	```
+	$ ansible-playbook  sample_playbook.yml --tags check
+	```
+
+- Connect to instance via ssh:
+    ```
+    $ssh -i ./id_rsa ubuntu@ec2-xx-xxx-xx-xxx.eu-west-1.compute.amazonaws.com
+    ```
+
+- Ping hosts with dynamic inventory scripts
+    ```
+    $ ansible -vvv -i ec2.py -u ubuntu eu-west-1 -m ping --key-file=./id_rsa
+    ```
+
 - Get list of instances usings `ec2.py`:
     ```
     $ ./ec2.py --list
@@ -74,17 +117,6 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
     }
     # to refresh cache run:
     $ ./ec2.py --refresh-cache
-    ```
-
-- Connect to instances via ssh:
-    ```
-    $ssh -i ./id_rsa ubuntu@ec2-xx-xxx-xx-xxx.eu-west-1.compute.amazonaws.com
-    ```
-
-- Ping hosts with dynamic inventory scripts
-    ```
-    $ ansible -vvv -i ec2.py -u ubuntu eu-west-1 -m ping --key-file=./id_rsa
-    $ ansible-playbook  -vvv sample_playbook.yml -i ec2.py --key-file=id_rsa
     ```
 
 ## Configuration

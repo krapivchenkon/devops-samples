@@ -1,54 +1,66 @@
 ---
-- name: ec2-sample
+#####################################################
+### Playbook contains tasks for gathering facts 
+#####################################################
+- name: GATHER FACTS
+  hosts: localhost
+  connection: local
+  gather_facts : false
+  tags: [start,stop,term,term_stopped,check]
+  tasks:
+    - name: Gather EC2 facts
+      ec2_remote_facts:
+        region: '{{ aws_default_region }}'
+        filters:
+          # instance-state-name: stopped
+          "tag:Name": "{{ aws_instance_tag }}"
+      register: ec2_info
+
+    - name: Collect facts about ec2 instance state
+      set_fact:
+        stopped_inst: "{{ ec2_info.instances|selectattr('state','equalto','stopped')|map(attribute='id')|list }}"
+        running_inst: "{{ ec2_info.instances|selectattr('state','equalto','running')|map(attribute='id')|list }}"
+        all_inst    : "{{ aws_ec2_count }}"
+    - debug: msg="Found {{running_inst|count}} running and {{stopped_inst|count}} stopped instances. Required number of running instances is {{all_inst}}."
+
+    - name: Add all instance public DNS to host group ec2
+      add_host: hostname={{ item }} groups=ec2
+      with_items: "{{ ec2_info.instances|selectattr('state','equalto','running')|map(attribute='public_dns_name')|list }}"
+      when: "{{running_inst|count > 0}}"
+
+    # - debug: msg="group is {{ ec2hosts }}."
+#####################################################
+### Playbook contains tasks for launching instances
+#####################################################
+- name: LAUNCH
   hosts: localhost
   connection: local
   gather_facts : false
   tags: start
   tasks:
-    # - name: Gather EC2 facts
-    #   ec2_remote_facts:
-    #     region: '{{ aws_default_region }}'
-    #     filters:
-    #       instance-state-name: stopped
-    #       "tag:Name": "{{ aws_instance_tag }}"
-    #   register: ec2_info
+    - set_fact:
+        # number of stopped instances that will be started
+        stopped_to_start: "{{ stopped_inst|lst_slice(0,all_inst-running_inst|count) }}"
+    
+    # - debug: msg="Stopped  {{stopped_to_start}}."
 
-    # # - debug: 
-    # #     var: ec2_info
-    # # - debug: 
-    # #     var: "{{item}}"
-    #   # with_items: "{{ec2_info.instances}}"
-    # # register new variable
-    # - set_fact: instance_ids=[] # register fact to be used in next task
-    # - set_fact:
-    #     instance_ids: "{{ instance_ids }} + [ '{{ item.id }}' ]"
-    #   with_items: "{{ec2_info.instances}}"
-    # - debug: var=instance_ids
-
-    - name: Provision a set of instances from stopped instances
-      tags: stopped
-      vars:
-        instance_ids:
-          - 'i-05ed8e8f'
-          - 'i-3655e2ba'
+    - name: Start stopped instances
       ec2:
-        # key_name: "{{ aws_key_name }}"
-        # group: '{{ aws_security_group }}'
         region: '{{ aws_default_region }}'
-        # instance_type: '{{ aws_instance_type }}'
-        # image: '{{ aws_ami_image }}'
-        instance_ids: "{{instance_ids}}"
+        instance_ids: "{{stopped_to_start}}"
         state: running
-        # wait: true
-        # instance_tags:
-          # Name: "{{aws_instance_tag}}"
-      # when: instance_ids|length > 0
-        # exact_count: 2
-        # count_tag: 
-          # Name: "{{aws_instance_tag}}"
-      # register: ec2
+      when: '{{ running_inst|count < all_inst }} and {{stopped_to_start|count > 0}}'
+    - debug: msg="Started {{stopped_to_start|count}} instances from existing {{stopped_inst|count}} stopped instances"
 
-    - name: Provision a set of instances
+    # wait for stopped instances to start to make sure exact_count will work correctly on the next step
+    - name: Wait for SSH to come up on stopped instances
+      #TODO: public_dns_name isn't available here. we need to re-fetch info from ec2 about this specific ids
+      wait_for: host={{ item.public_dns_name }} port=22 delay=30 timeout=120 state=started
+      with_items: '{{ ec2_info.instances }}'
+      # skip this task if there are no stopped instances to be started
+      when: "ec2_info.instances is defined and {{stopped_to_start|count > 0}}"
+
+    - name: Start missing ec2 instances
       ec2:
         key_name: "{{ aws_key_name }}"
         group: '{{ aws_security_group }}'
@@ -56,7 +68,8 @@
         instance_type: '{{ aws_instance_type }}'
         image: '{{ aws_ami_image }}'
         wait: true
-        exact_count: 2
+        # exact_count: '{{all_inst-running_inst|count-stopped_to_start|count}}'
+        exact_count: '{{all_inst}}'
         count_tag: 
           Name: "{{aws_instance_tag}}"
         instance_tags:
@@ -66,186 +79,67 @@
     - debug: "msg='Started instances {{ ec2.instances }}'"
       when: ec2.instances is defined
 
-    # TODO: add wait for ssh task
-    # - name: Wait for SSH to come up
-    #   wait_for: host={{ item.public_dns_name }} port=22 delay=60 timeout=320 state=started
-    #   with_items: '{{ ec2.instances }}'
+    - name: Wait for SSH to come up
+      # this doesn't actually mean that you can login to machine
+      # TODO: find a way to check when instance is actually ready and health checks passed
+      wait_for: host={{ item.public_dns_name }} port=22 delay=60 timeout=320 state=started
+      with_items: '{{ ec2.instances }}'
+      when: ec2.instances is defined
 
     - name: Add all instance public IPs to host group
       add_host: hostname={{ item.public_ip }} groups=ec2hosts
       with_items: '{{ ec2.instances }}'
+      when: ec2.instances is defined
 
 
-# - authorized_key: user=charlie key="{{ lookup('file', 'id_rsa.pub') }}"
 
-- name: configuration play
-  hosts: ec2hosts,ec2
-  remote_user: ubuntu
-  tags: check
-  gather_facts: false
-  become: true
-  tasks:
-    - name: Get Server Hostname
-      # shell: bash -c hostname
-      command: whoami
-      become: true
-      register: hname
-    # sites is a var from default section
-    # changed_when: "active.stdout_lines != sites.keys()"
-
-    - debug: var=hname.stdout_lines
-
-
-- name: state mgmt play
+#####################################################
+### Playbook contains tasks for stopping or termintaing instances
+#####################################################
+- name: STOP/TERM
   hosts: localhost
   connection: local
-  # user: ubuntu
-  tags: stop
   gather_facts: false 
   tasks:
-    - name: Gather EC2 facts
-      ec2_remote_facts:
-        region: '{{ aws_default_region }}'
-        filters:
-          instance-state-name: running
-          "tag:Name": "{{ aws_instance_tag }}"
-      register: ec2_info
-
-    # - debug: 
-    #     var: ec2_info
-    # - debug: 
-    #     var: "{{item}}"
-      # with_items: "{{ec2_info.instances}}"
-    # register new variable
-    - set_fact: instance_ids=[] # register fact to be used in next task
-    - set_fact:
-        instance_ids: "{{ instance_ids }} + [ '{{ item.id }}' ]"
-      with_items: "{{ec2_info.instances}}"
-    - debug: var=instance_ids
-
-
     - name: Stop the sandbox instances
-      # tags: stop
+      tags: stop
       ec2:
         group: '{{ aws_security_group }}'
         region: '{{ aws_default_region }}'
         key_name: "{{ aws_key_name }}"
-        instance_ids: "{{ instance_ids }}"
-        # instance_tags: 
-          # Name: "{{aws_instance_tag}}"
+        instance_ids: "{{ running_inst }}"
         state: stopped
-        # if this is not VPC instance source_dest_check should be off
-        # source_dest_check: no
         wait: True
-      # fail: msg="Tasl failed"
-      # ignore_errors: yes #suppress because of "You may only describe the sourceDestCheck attribute for VPC instances" message
-          # instance_ids: '{{ instance_ids }}'
-          # region: '{{ region }}'
-          # state: stopped
-          # vpc_subnet_id: subnet-29e63245
-          # assign_public_ip: yes
 
-    # - name: Terminate instances
-    #   tags: term
-    #   ec2:
-    #     region: '{{ aws_default_region }}'
-    #     group: '{{ aws_security_group }}'
-    #     instance_tags: 
-    #       Name: "Demo"
-    #     state: absent
-    #     wait: True
+    - name: Terminate instances
+      tags: term
+      ec2:
+        region: '{{ aws_default_region }}'
+        group: '{{ aws_security_group }}'
+        instance_tags: 
+          Name: "Demo"
+        state: absent
+
+    - name: Terminate only stopped instances
+      tags: term_stopped
+      ec2:
+        region: '{{ aws_default_region }}'
+        group: '{{ aws_security_group }}'
+        instance_ids: "{{ stopped_inst }}"
+        state: absent
 
 
-
-- name: state mgmt play
-  hosts: localhost
-  connection: local
-  tags: facts
+#####################################################
+### Playbook contains tasks to perform health checks on the system
+#####################################################
+- name: HEALTH CHECK
+  hosts: ec2
+  tags: check
+  remote_user: "{{aws_ec2_user}}"
+  become: true
+  # connection: local
   gather_facts: false 
   tasks:
-    - name: Gather EC2 facts
-      ec2_remote_facts:
-        region: '{{ aws_default_region }}'
-        # filters:
-          # instance-state-name: running
-          # "tag:Name": "{{ aws_instance_tag }}"
-      register: ec2_info
-
-    # - debug: 
-    #     var: ec2_info
-    # - debug: 
-    #     var: "{{item}}"
-    #   with_items: "{{ec2_info.instances}}"
-    # register new variable
-    # - set_fact: instance_ids=[] # register fact to be used in next task
-    #TODO: test list creation using |map(attribute="id")|list filter
-    - set_fact:
-        instance_ids: "{{ instance_ids|default([]) }} + [ '{{ item.id }}' ]"
-      with_items: "{{ec2_info.instances}}"
-    - debug: var=instance_ids
-
-    # test list slice
-    # - debug: 'var="{%- i for i in instance_ids|slice(2) %}"'
-    - debug:
-        msg: "Len of Array is:{{ instance_ids|length }}"
-    - debug: 
-        var: "{{ item }}"
-      with_items: "{{ instance_ids | lst_slice(0,3) }}"
-
-    # - add_host: hostname={{ item.public_dns_name }} groupname=ec2hosts
-    #   with_items: "{{ec2_info.instances}}"
-
-    # - name: wait for instances to listen on port:22
-    #   debug:
-    #     var=item
-    #     # host={{ item.public_dns_name }}
-    #     # port=22
-    #   with_items: "{{ec2_info.instances}}"
-
-    # Connect to the node and gather facts,
-    # including the instance-id. These facts
-    # are added to inventory hostvars for the
-    # duration of the playbook's execution
-
-# - name: gather Facts from within ec2 metadata
-#   hosts: ec2hosts
-#   gather_facts: True
-#   user: ubuntu
-#   # sudo: True
-#   tasks:
-#     # fetch instance data from the metadata servers in ec2
-#     - ec2_facts:
-
-#     # show all known facts for this host
-#     - debug: var=hostvars[inventory_hostname]
-
-#     # just show the instance-id
-#     - debug: msg="{{ hostvars[inventory_hostname]['ansible_ec2_instance-id'] }}"
-
-
-# Start a few existing instances, run some tasks
-# and stop the instances
-
-- name: Start sandbox instances
-  hosts: localhost
-  gather_facts: false
-  connection: local
-  tags: test
-  vars:
-    instance_ids:
-      - 'i-5cf291d6'
-  tasks:
-    - name: Start the sandbox instances
-      local_action:
-        module: ec2
-        instance_ids: '{{ instance_ids }}'
-        region: '{{ aws_default_region }}'
-        state: running
-        wait: True
-
-- name: debug
-  hosts: localhost
-  connection: local
-  tags: debug
-  tasks:
-    - debug: "var=aws_default_region"
+    # - name: Get hostname
+      # command: hostname
+    - shell: hostname

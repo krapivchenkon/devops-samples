@@ -1,0 +1,110 @@
+- name: Play describe various operations on variables
+  hosts: localhost
+  connection: local
+  tags: facts
+  gather_facts: false 
+  tasks:
+    - name: Gather EC2 facts
+      ec2_remote_facts:
+        region: '{{ aws_default_region }}'
+        filters:
+          # instance-state-name: running
+          "tag:Name": "{{ aws_instance_tag }}"
+      register: ec2_info
+
+    - debug: 
+        var: "{{ item }}"
+      # select all instnces in eu-west-1c zone
+      with_items: "{{ ec2_info.instances|selectattr('placement.zone','equalto','eu-west-1c')|list }}"
+
+    # define a variable that will live accross playbooks:
+    - set_fact:
+        instance_ids: "{{ ec2_info.instances|selectattr('placement.zone','equalto','eu-west-1a')|map(attribute='id')|list }}"
+
+    - debug:
+        # define vars that are available while task execution 
+        var: 
+          id: "{{ item }}"
+      # test list creation using |map(attribute="id")|list filter
+      # select all instances in eu-west-1c zone and select only id attibutes
+      with_items: "{{ instance_ids }}"
+
+    # TODO: test slice with range and extract filters (scheduled for ansible 2.1, current version is 2.0.2.0)
+    # - debug: msg="MSG {{ range(3)|map('extract',instance_ids)|list }}"
+
+    # extract multiple values from a dict into a list of dicts
+    - set_fact:
+        instance_dict: "{{ instance_dict|default([])|union([dict(id=item.id,state=item.state)]) }}"
+      with_items: "{{ec2_info.instances}}"
+
+    - debug: 
+        msg: "{{ item }}"
+      with_items: "{{instance_dict }}"
+
+
+
+- name: Play describe various operations on variables
+  hosts: localhost
+  tags: output_test
+  connection: local
+  gather_facts: false 
+  tasks:
+    - set_fact: 
+        php_command_result:
+          results: [{"value":{"svn_tag":"20150703r1_6.36_homeland"},"key":"ui"},{"value":{"svn_tag":"20150702r1_6.36_homeland"},"key":"api"}]
+      changed_when: False
+    - set_fact:
+        php_fmt: "{{ php_fmt|default([])|union([item.key+' -- '+item.value.svn_tag ]) }}"
+      with_items: [{"value":{"svn_tag":"20150703r1_6.36_homeland"},"key":"ui"},{"value":{"svn_tag":"20150702r1_6.36_homeland"},"key":"api"}]
+
+    - debug: 
+        msg: "{{php_fmt|join(',')}}"
+
+
+
+    # hack: create list of instances using string concatenations
+    # - set_fact:
+        # this task creates a fact that contains list
+        # instance_ids: "{{ instance_ids|default([]) }} + [ '{{ item.id }}' ]"
+      # with_items: "{{ec2_info.instances}}"
+
+## selectattr builtin tests
+## http://jinja.pocoo.org/docs/dev/templates/#list-of-builtin-tests
+
+
+
+
+- name: ec2-sample
+  hosts: localhost
+  connection: local
+  gather_facts : false
+  tags: start
+  tasks:
+    - name: Gather EC2 facts
+      ec2_remote_facts:
+        region: '{{ aws_default_region }}'
+        filters:
+          # instance-state-name: stopped
+          "tag:Name": "{{ aws_instance_tag }}"
+      register: ec2_info
+
+
+    - name: Collect facts about ec2 instance state
+      set_fact:
+        stopped_inst: "{{ ec2_info.instances|selectattr('state','equalto','stopped')|map(attribute='id')|list }}"
+        running_inst: "{{ ec2_info.instances|selectattr('state','equalto','running')|map(attribute='id')|list }}"
+        all_inst    : "{{ aws_ec2_count }}"
+    - set_fact:
+        # number of stopped instances that will be started
+        stopped_to_start: "{{ stopped_inst|lst_slice(0,all_inst-running_inst|count) }}"
+    
+
+
+    - name: Start stopped instances
+      debug: msg="Starting {{all_inst-running_inst|count}} instances {{ item }}"
+      with_items: "{{ stopped_to_start }}"
+      when: "{{ running_inst|count < all_inst }}"
+
+    - name: Start missing ec2 instances
+      debug: msg="Starting additional {{all_inst-running_inst|count-stopped_to_start|count}} instances "
+
