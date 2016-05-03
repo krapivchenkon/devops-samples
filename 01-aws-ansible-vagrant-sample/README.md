@@ -63,13 +63,14 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
 	> **all_inst** - number of instances that should be in running state  
 	> **stop_inst** - number of currently stopped instances of the same type(from **ec2_remote_facts**)  
 	> **run_inst** -  - number of currently running instances of the same type(from **ec2_remote_facts**)  
-	> 
+	>
+ 
 	```python
 	if run_inst < all_inst:
 		startInstances(all_inst-run_inst)
 
-	# following command will ensure that we are running correct number of instances
-	# this is the case when there are not enough stopped instances (all_inst>(run_inst+stop_inst))
+	\# following command will ensure that we are running correct number of instances
+	\# this is the case when there are not enough stopped instances (all_inst>(run_inst+stop_inst))
 	run_ec2_task_with_exact_count(all_inst)
 	```   
 	
