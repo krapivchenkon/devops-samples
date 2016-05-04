@@ -61,7 +61,6 @@
         msg: "{{php_fmt|join(',')}}"
 
 
-
     # hack: create list of instances using string concatenations
     # - set_fact:
         # this task creates a fact that contains list
@@ -71,40 +70,4 @@
 ## selectattr builtin tests
 ## http://jinja.pocoo.org/docs/dev/templates/#list-of-builtin-tests
 
-
-
-
-- name: ec2-sample
-  hosts: localhost
-  connection: local
-  gather_facts : false
-  tags: start
-  tasks:
-    - name: Gather EC2 facts
-      ec2_remote_facts:
-        region: '{{ aws_default_region }}'
-        filters:
-          # instance-state-name: stopped
-          "tag:Name": "{{ aws_instance_tag }}"
-      register: ec2_info
-
-
-    - name: Collect facts about ec2 instance state
-      set_fact:
-        stopped_inst: "{{ ec2_info.instances|selectattr('state','equalto','stopped')|map(attribute='id')|list }}"
-        running_inst: "{{ ec2_info.instances|selectattr('state','equalto','running')|map(attribute='id')|list }}"
-        all_inst    : "{{ aws_ec2_count }}"
-    - set_fact:
-        # number of stopped instances that will be started
-        stopped_to_start: "{{ stopped_inst|lst_slice(0,all_inst-running_inst|count) }}"
-    
-
-
-    - name: Start stopped instances
-      debug: msg="Starting {{all_inst-running_inst|count}} instances {{ item }}"
-      with_items: "{{ stopped_to_start }}"
-      when: "{{ running_inst|count < all_inst }}"
-
-    - name: Start missing ec2 instances
-      debug: msg="Starting additional {{all_inst-running_inst|count-stopped_to_start|count}} instances "
 

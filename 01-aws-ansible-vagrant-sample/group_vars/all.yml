@@ -3,11 +3,14 @@
 
 
 # AWS vars
-aws_default_region      : 'eu-west-1'
-aws_security_group      : 'default'
-aws_instance_type       : 't2.micro'
-aws_ami_image           : 'ami-823686f5' # ubuntu image
-aws_instance_tag        : 'AnsibleDemo'
-aws_key_name            : 'ec2demo'
-aws_ec2_count           : 5
-aws_ec2_user            : 'ubuntu'
+aws_default_region           : 'eu-west-1'
+aws_security_group           : 'default'
+aws_instance_type            : 't2.micro'
+aws_ami_image                : 'ami-823686f5' # ubuntu image
+aws_instance_tag             : 'AnsibleDemo'
+aws_key_name                 : 'ansible-ec2-demo'
+# ansible_ssh_public_key_file  : "id_rsa.pub"
+ansible_ssh_private_key_file : "./id_rsa_aws" #the one that will be installed as well to instances as authorized key
+
+aws_ec2_count                : 2
+aws_ec2_user                 : 'ubuntu'

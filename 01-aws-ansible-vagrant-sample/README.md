@@ -9,24 +9,25 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
 	- Launching instances (`--tags start`)
 	- Stopping instances (`--tags stop`)
 	- Terminating instances (`--tags term` or `--tags term_stopped`)
-	- `TODO:` Restarting instances (`--tags restart`)
 	- Simple health check tasks (`--tags check`)
+	- Check status on current ec2 instances(`--tags status`)
 - `TODO:` Uses EC2 Dynamic inventory scripts to create static **hosts_ec2** file
-- `TODO:` On starting instance ssh and icmp rules are configured in default security group
-- `TODO:` SSH key-pair created automatically with pass-phrase check and ssh-agent on startup
-- Playbooks are using ec2_remote_facts with tag filters to add existing hosts to **ec2hosts** group.
+- Setup inbound ACL rules and ssh keys(`--tags setup`):
+	- SSH and icmp rules are configured in default security group
+	- SSH key-pair created automatically by **ec2_keys** module
+- Playbooks are using **ec2_remote_facts** module with tag filters to add existing hosts to **ec2** group.
 	- when running start/stop/term/restart instances host group created from the values returned by **ec2_remote_facts**
-- `TODO:` Enable python paramiko for ssh connections 
+
 
 ### Configuration assumptions
 - all instances are created in default **security group**.
-- [group_vars/ec2.yml](group_vars/ec2.yml) contains following configurations:
-	- Path to ssh_key
 - [group_vars/all.yml](group_vars/all.yml) contains following configurations:
 	- Default zone in `aws_default_region`
+	- Path to ssh_private_key
 	- Tag name that will be assigned to ec2 instances
 ### Prerequisites
 - You'll need `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables set up.
+- `virtualenv` and `pip` installed
 - `TODO:` Installed `vagrant` if you want to use vagrant to spin off machines
 
 ## Setup
@@ -43,19 +44,12 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
     $ export AWS_SECRET_ACCESS_KEY='YOUR-SECRET-KEY'
     ```
 
-- `TODO:` Generate ssh key and exchange it with server (should be part of ansible playbook)
+-  Setup ssh key and inbound security rules
     ```
-    ssh-keygen -t rsa -b 4096 -C "youremail@example.com" -f ./id_rsa && chmod 600 id_rsa.pub
-    aws ec2 import-key-pair --key-name ec2demo --public-key-material file://./id_rsa.pub
-    ```
-
-- `TODO:` Add dynamic inventory scripts using ansible(`ec2.py` and `ec2.ini`) (should be part of playbook)
-    ```
-    ansible-playbook -vvv sample_playbook.yml -i hosts
+    $ ansible-playbook  sample_playbook.yml --tags setup
     ```
 
-- `TODO:` Add ssh inbound rule to security group configuration (should be done by ec2_groups module)
-- Start instances
+- **Start instances**
     ```
     $ ansible-playbook  sample_playbook.yml --tags start
     ```
@@ -69,18 +63,19 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
 	if run_inst < all_inst:
 		startInstances(all_inst-run_inst)
 
-	`#` following command will ensure that we are running correct number of instances
-	`#` this is the case when there are not enough stopped instances (all_inst>(run_inst+stop_inst))
+	following command will ensure that we are running correct number of instances
+	this is the case when there are not enough stopped instances (all_inst>(run_inst+stop_inst)):
+
 	run_ec2_task_with_exact_count(all_inst)
 	```   
 	
-- Stop instances 
+- **Stop instances**   
 	Following will stop all running instances
     ```
     $ ansible-playbook  sample_playbook.yml --tags stop
     ```
 
-- Terminate instances 
+- **Terminate instances**   
 	Following will terminate all instances with specific tag
     ```
     $ ansible-playbook  sample_playbook.yml --tags term
@@ -90,34 +85,19 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
     $ ansible-playbook  sample_playbook.yml --tags term_stopped
     ```
 
-- Restart instances 
+
 
 ## Checking environment
 - Run health checks on ec2 host group
 	```
 	$ ansible-playbook  sample_playbook.yml --tags check
+	$ ansible-playbook  sample_playbook.yml --tags status
 	```
 
-- Connect to instance via ssh:
+- Connect to instance via ssh:   
+	`TODO:` script wrapper to easy connect to required instance
     ```
     $ssh -i ./id_rsa ubuntu@ec2-xx-xxx-xx-xxx.eu-west-1.compute.amazonaws.com
-    ```
-
-- Ping hosts with dynamic inventory scripts
-    ```
-    $ ansible -vvv -i ec2.py -u ubuntu eu-west-1 -m ping --key-file=./id_rsa
-    ```
-
-- Get list of instances usings `ec2.py`:
-    ```
-    $ ./ec2.py --list
-    {
-      "_meta": {
-        "hostvars": {}
-        }
-    }
-    # to refresh cache run:
-    $ ./ec2.py --refresh-cache
     ```
 
 ## Configuration

@@ -1,12 +1,71 @@
 ---
 #####################################################
+### Current play contains task to setup proper aws 
+### connection:
+### - create aws_key_name
+### - setup inbound/outbound ACL
+#####################################################
+- name: SETUP AWS CONNECTION
+  hosts: localhost
+  tags: setup
+  connection: local
+  gather_facts: false   
+  tasks:
+    # Following tasks will create private key file if its missing
+    - stat: 
+        path: "{{ansible_ssh_private_key_file}}"
+      register: aws_pkey
+    - name: example ec2 key
+      # debug: msg="File missing"
+      ec2_key:
+        region: '{{ aws_default_region }}'
+        name: "{{aws_key_name}}"
+      register: aws_ssh_key
+      when: aws_pkey.stat.exists == False
+    
+    # - debug: msg="new key_material {{aws_ssh_key}}."
+    - copy:
+        content: "{{ aws_ssh_key.key.private_key }}"
+        dest: "{{ansible_ssh_private_key_file}}"
+        mode: 0600
+      when: aws_pkey.stat.exists == False
+
+    # Below task creates ACL rules for default security group
+    - name: Create HTTP and HTTPS Security Group
+      ec2_group:
+        # module: ec2_group
+        region: "{{ aws_default_region }}"
+        # vpc_id: "{{ vpc }}"
+        name: "{{aws_security_group}}"
+        description: Security group for HTTP(S) access
+        rules:
+          - proto: all
+            group_name: "{{aws_security_group}}"
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: 0.0.0.0/0
+          - proto: icmp
+            from_port: -1 # icmp type, -1 = any type
+            to_port:  -1 # icmp subtype, -1 = any subtype
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            from_port: 22
+            to_port: 22
+            cidr_ip: 0.0.0.0/0
+        rules_egress:
+          - proto: all
+            cidr_ip: 0.0.0.0/0
+
+
+#####################################################
 ### Playbook contains tasks for gathering facts 
 #####################################################
 - name: GATHER FACTS
   hosts: localhost
   connection: local
   gather_facts : false
-  tags: [start,stop,term,term_stopped,check]
+  tags: [start,stop,term,term_stopped,check,status]
   tasks:
     - name: Gather EC2 facts
       ec2_remote_facts:
@@ -28,7 +87,7 @@
       with_items: "{{ ec2_info.instances|selectattr('state','equalto','running')|map(attribute='public_dns_name')|list }}"
       when: "{{running_inst|count > 0}}"
 
-    # - debug: msg="group is {{ ec2hosts }}."
+
 #####################################################
 ### Playbook contains tasks for launching instances
 #####################################################
@@ -53,12 +112,12 @@
     - debug: msg="Started {{stopped_to_start|count}} instances from existing {{stopped_inst|count}} stopped instances"
 
     # wait for stopped instances to start to make sure exact_count will work correctly on the next step
-    - name: Wait for SSH to come up on stopped instances
-      #TODO: public_dns_name isn't available here. we need to re-fetch info from ec2 about this specific ids
-      wait_for: host={{ item.public_dns_name }} port=22 delay=30 timeout=120 state=started
-      with_items: '{{ ec2_info.instances }}'
-      # skip this task if there are no stopped instances to be started
-      when: "ec2_info.instances is defined and {{stopped_to_start|count > 0}}"
+    # - name: Wait for SSH to come up on stopped instances
+    #   #TODO: public_dns_name isn't available here. we need to re-fetch info from ec2 about this specific ids
+    #   wait_for: host={{ item.public_dns_name }} port=22 delay=30 timeout=120 state=started
+    #   with_items: '{{ ec2_info.instances }}'
+    #   # skip this task if there are no stopped instances to be started
+    #   when: "ec2_info.instances is defined and {{stopped_to_start|count > 0}}"
 
     - name: Start missing ec2 instances
       ec2:
@@ -116,8 +175,9 @@
       ec2:
         region: '{{ aws_default_region }}'
         group: '{{ aws_security_group }}'
-        instance_tags: 
-          Name: "Demo"
+        instance_ids: "{{ ec2_info.instances|map(attribute='id')|list }}"
+        # instance_tags: 
+          # Name: "{{aws_instance_tag}}"
         state: absent
 
     - name: Terminate only stopped instances
@@ -130,16 +190,35 @@
 
 
 #####################################################
-### Playbook contains tasks to perform health checks on the system
+### Playbook contains tasks to perform health checks 
+### on the system
 #####################################################
 - name: HEALTH CHECK
   hosts: ec2
   tags: check
   remote_user: "{{aws_ec2_user}}"
   become: true
-  # connection: local
   gather_facts: false 
   tasks:
-    # - name: Get hostname
-      # command: hostname
     - shell: hostname
+
+#####################################################
+### Playbook contains tasks to retrive status instead 
+### of using aws console
+#####################################################
+#TODO: play for getting status about running instances
+- name: HEALTH CHECK
+  hosts: localhost
+  tags: status
+  # remote_user: "{{aws_ec2_user}}"
+  # become: true
+  gather_facts: false 
+  tasks:
+    - set_fact:
+        ec2_status: "{{ ec2_status|default([])|union([dict(dns=item.public_dns_name,id=item.id, state=item.state)]) }}"
+      with_items: "{{ec2_info.instances}}"
+    # - debug: 
+    #     var: 
+    #       "{{item.id}}": "{{item}}"
+    #   with_items: "{{ec2_status}}"
+    - debug: msg="{{ec2_status}}"
