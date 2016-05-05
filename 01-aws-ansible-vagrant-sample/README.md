@@ -101,15 +101,6 @@ This sample shows how ec2 instances can be fully managed with ansible playbooks
     ```
 
 ## Configuration
-- Dynamic inventory cache configuration
-
-    EC2 inventory cache time can be configured in [ec2.ini](https://raw.githubusercontent.com/ansible/ansible/devel/contrib/inventory/ec2.ini) file:
-  ```
-  # The number of seconds a cache file is considered valid. After this many
-  # seconds, a new API call will be made, and the cache file will be updated.
-  # To disable the cache, set this value to 0
-  cache_max_age = 300
-  ```
  
 - If you are running `virtualenv` path to python should be set in group vars [group_vars/all.yml](group_vars/all.yml):
     ```
