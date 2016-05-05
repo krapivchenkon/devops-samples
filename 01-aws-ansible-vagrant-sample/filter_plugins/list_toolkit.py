@@ -15,6 +15,7 @@ def lst_slice(lst,a,b):
         # c = set(a) & set(b)
     # else:
         # c = unique(filter(lambda x: x in b, a))
+        #TODO: add proper args check
         return lst[a:b]
 
 class FilterModule(object):
@@ -22,7 +23,6 @@ class FilterModule(object):
 
     def filters(self):
         return {
-            # general math
 
             'lst_slice' : lst_slice,
 
